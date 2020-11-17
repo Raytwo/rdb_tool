@@ -1,6 +1,3 @@
-// Sorry but this needed three mores extra lines
-// To be 69 lines
-
 use std::path::PathBuf;
 
 use binread::{io::SeekFrom, BinRead, NullString};
@@ -22,7 +19,7 @@ pub struct RdbHeader {
     pub path: String,
 }
 
-#[derive(BinRead, BinWrite, Debug)]
+#[derive(BinRead, BinWrite, Debug, Clone)]
 pub struct RdbEntry {
     pub magic: u32,
     pub version: u32,
@@ -66,13 +63,14 @@ impl RdbEntry {
         std::str::from_utf8_mut(self.name.as_mut_slice()).unwrap()
     }
 
-    pub fn set_external_file(&mut self, metadata: &std::fs::Metadata) {
+    pub fn set_external_file(&mut self, path: &std::path::Path) {
         let mut name = self.get_name_mut().to_string();
-        if let Some(size_marker) = name.find("@") {
-            name.replace_range(size_marker.., &format!("@{:x}", metadata.len()));
-        }
 
-        self.file_size = metadata.len();
+        self.file_size = path.metadata().unwrap().len();
+
+        if let Some(size_marker) = name.find("@") {
+            name.replace_range(size_marker.., &format!("@{:x}", self.file_size));
+        }
 
         if self.file_size == 0 {
             println!("Filesize is 0. Are you sure about that?");
@@ -86,6 +84,36 @@ impl RdbEntry {
         self.string_size = name.len() as _;
         // Edit the size of the entry to take the new name into account
         self.entry_size += self.string_size;
+
+        let mut ext_entry = self.clone();
+        ext_entry.patch_external_file(path);
+    }
+
+    pub fn patch_external_file(&mut self, path: &std::path::Path) {
+        self.name = vec![];
+        //self.write(&mut bytes).unwrap();
+
+        let cursor : &mut std::io::Cursor<Vec<u8>> = &mut std::io::Cursor::new(Vec::new());
+        
+        let file = std::fs::read(path).unwrap();
+
+        if &file[0..4] == b"IDRK" {
+            println!("Already patched");
+            return;
+        }
+
+        self.entry_size = self.entry_size + file.len() as u32 - self.string_size;
+        self.file_size = file.len() as _;
+        self.string_size = self.file_size as _;
+        self.flags = RdbFlags::new();
+        
+        self.write(cursor).unwrap();
+        file.write(cursor).unwrap();
+
+        match std::fs::write(path, cursor.get_ref()) {
+            Ok(_) => {},
+            Err(err) => panic!(err),
+        };
     }
 }
 
@@ -99,8 +127,14 @@ pub struct Rdb {
     pub entries: Vec<RdbEntry>,
 }
 
+impl Rdb {
+    pub fn get_entry_by_KTID(&mut self, ktid: u32) -> Option<&mut RdbEntry> {
+        self.entries.iter_mut().find(|x| x.file_ktid == ktid)
+    }
+}
+
 #[bitfield]
-#[derive(BinRead, BinWrite, Debug)]
+#[derive(BinRead, BinWrite, Debug, Copy, Clone)]
 #[br(map = Self::from_bytes)]
 pub struct RdbFlags {
     pub unk: B16,

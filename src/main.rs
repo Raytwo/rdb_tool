@@ -63,7 +63,7 @@ fn patch_rdb(path: &Path, out_path: &Path) -> Result<(), String> {
                 println!("Patching {}", filename);
                 entry_found.make_external();
                 entry_found.make_uncompressed();
-                entry_found.set_external_file(&metadata);
+                entry_found.set_external_file(&entry.path());
             },
             None => println!("File {} not found in the RDB. Skipping.", filename),
         }
@@ -91,10 +91,25 @@ fn main() {
 mod tests {
     use super::*;
 
-    const TEST_CONTENTS: &[u8] = include_bytes!("../MaterialEditor.rdb");
+    const TEST_CONTENTS: &[u8] = include_bytes!("../ScreenLayout.rdb");
 
     #[test]
     fn test() {
         
+    }
+
+    #[test]
+    fn type_8_search() {
+        let mut rdb: Rdb = Rdb::read(&mut Cursor::new(TEST_CONTENTS)).unwrap();
+        let entry = rdb.get_entry_by_KTID(0xf82a2296).unwrap();
+        dbg!(entry);
+    }
+
+    #[test]
+    fn patch_texternal() {
+        let mut rdb: Rdb = Rdb::read(&mut Cursor::new(TEST_CONTENTS)).unwrap();
+        let entry = rdb.get_entry_by_KTID(0xf82a2296).unwrap();
+        //entry.patch_external_file();
+        dbg!(entry);
     }
 }
