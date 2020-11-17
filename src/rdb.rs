@@ -102,12 +102,15 @@ impl RdbEntry {
             return;
         }
 
-        self.entry_size = self.entry_size + file.len() as u32 - self.string_size;
+        let header_size = self.entry_size - self.string_size;
+        
+        self.entry_size = header_size + file.len() as u32;
         self.file_size = file.len() as _;
         self.string_size = self.file_size as _;
         self.flags = RdbFlags::new();
         
         self.write(cursor).unwrap();
+        cursor.set_position(header_size as _);
         file.write(cursor).unwrap();
 
         match std::fs::write(path, cursor.get_ref()) {

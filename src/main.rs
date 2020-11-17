@@ -6,15 +6,13 @@ use binwrite::BinWrite;
 
 mod rdb;
 use rdb::Rdb;
-use rdb::RdbEntry;
-use rdb::RdbFlags;
 
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "RdbTool",
-    about = "Simple command-line tool to manipulate RDB files. You are expected to patch your external file's header yourself for now."
+    about = "Simple command-line tool to manipulate RDB files."
 )]
 struct Opt {
     #[structopt(parse(from_os_str), help = "Path to the RDB file relative to RdbTool's executable")]
