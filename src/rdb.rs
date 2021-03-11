@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::{fs::OpenOptions, io::{BufReader, BufWriter}, path::PathBuf};
+use std::io::*;
 
 use binread::{io::SeekFrom, BinRead, NullString};
 
@@ -93,27 +94,41 @@ impl RdbEntry {
         self.name = vec![];
         //self.write(&mut bytes).unwrap();
 
-        let cursor : &mut std::io::Cursor<Vec<u8>> = &mut std::io::Cursor::new(Vec::new());
-        
-        let file = std::fs::read(path).unwrap();
+        //let cursor : &mut std::io::Cursor<Vec<u8>> = &mut std::io::Cursor::new(Vec::new());
 
-        if &file[0..4] == b"IDRK" {
+        let mut test = OpenOptions::new().read(true).write(true).create(true).open(path).unwrap();
+        
+        //let file = std::fs::read(path).unwrap();
+
+        let mut buffer = Vec::new();        
+        
+        let mut out_sig = [0;4];
+        test.read(&mut out_sig);
+
+        if &out_sig == b"IDRK" {
             println!("Already patched");
             return;
         }
 
+        test.seek(SeekFrom::Start(0)).unwrap();
+
         let header_size = self.entry_size - self.string_size;
         
-        self.entry_size = header_size + file.len() as u32;
-        self.file_size = file.len() as _;
+        self.entry_size = header_size + test.metadata().unwrap().len() as u32;
+        self.file_size = test.metadata().unwrap().len() as _;
         self.string_size = self.file_size as _;
         self.flags = RdbFlags::new();
-        
-        self.write(cursor).unwrap();
-        cursor.set_position(header_size as _);
-        file.write(cursor).unwrap();
 
-        match std::fs::write(path, cursor.get_ref()) {
+        //test.seek(SeekFrom::Start(0)).unwrap();
+        self.write(&mut buffer).unwrap();
+        test.read_to_end(&mut buffer).unwrap();
+        
+        // let mut writer = BufWriter::new(test);
+        // writer.seek(SeekFrom::Start(0)).unwrap();
+
+        // self.write(&mut writer).unwrap();
+        //writer.write_all(&mut reader.buffer());
+        match std::fs::write(path, &buffer) {
             Ok(_) => {},
             Err(err) => panic!(err),
         };

@@ -105,9 +105,10 @@ mod tests {
 
     #[test]
     fn patch_texternal() {
-        let mut rdb: Rdb = Rdb::read(&mut Cursor::new(TEST_CONTENTS)).unwrap();
-        let entry = rdb.get_entry_by_KTID(0xf82a2296).unwrap();
-        //entry.patch_external_file();
-        dbg!(entry);
+        //let mut rdb: Rdb = Rdb::read(&mut Cursor::new(TEST_CONTENTS)).unwrap();
+        patch_rdb(Path::new("ScreenLayout.rdb"), Path::new("cock.rdb"));
+        // let entry = rdb.get_entry_by_KTID(0x0a696242).unwrap();
+        // entry.patch_external_file();
+        //dbg!(entry);
     }
 }
