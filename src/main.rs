@@ -27,18 +27,25 @@ fn patch_rdb(args: &Opt) -> Result<(), String> {
     let mut rdb: Rdb = Rdb::read(&mut Cursor::new(&std::fs::read(&args.path).unwrap())).unwrap();
 
     let external_path = if args.data_path.is_relative() {
-        PathBuf::from(std::fs::canonicalize(args.path.parent().unwrap()).unwrap()).join(&args.data_path)
+
+        let rdb_dir = if args.path.is_relative() {
+            std::fs::canonicalize(&args.path).unwrap().parent().unwrap().to_path_buf()
+        } else {
+            args.path.parent().unwrap().to_path_buf()
+        };
+
+        rdb_dir.join(&args.data_path)
     } else {
         args.data_path.to_path_buf()
     };
 
     if !external_path.exists() {
-        return Err(format!("Couldn't find a directory to patch ('{}'). Consider making it.", external_path.display()));
+        return Err(format!("Couldn't find a directory to patch ('{}' was used). Consider making it?", external_path.display()));
     }
 
     let files = match std::fs::read_dir(external_path) {
         Ok(files) => files,
-        Err(_) => return Err("How did you even managed to delete the internal path directory this fast? Stop that.".to_string()),
+        Err(_) => return Err("How did you even managed to delete the directory this fast? Stop that.".to_string()),
     };
 
     for entry in files {
@@ -76,16 +83,18 @@ fn patch_rdb(args: &Opt) -> Result<(), String> {
     let mut bytes = vec![];
     rdb.write(&mut bytes).unwrap();
 
-    match std::fs::write(&args.out_path, bytes) {
-        Ok(_) => {},
-        Err(err) => panic!(err),
-    };
+    std::fs::write(&args.out_path, bytes).unwrap();
 
     Ok(())
 }
 
 fn main() {
-    let opt = Opt::from_args();
+    
+    let opt = Opt::from_args_safe().unwrap_or_else(|err| {
+        println!("{}", err);
+        std::process::exit(1);
+    });
+    println!("{:#?}", opt);
 
     if let Err(error_msg) = patch_rdb(&opt) {
         println!("{}", error_msg);
