@@ -15,19 +15,25 @@ use structopt::StructOpt;
     about = "Simple command-line tool to manipulate RDB files."
 )]
 struct Opt {
-    #[structopt(parse(from_os_str), help = "Path to the RDB file relative to RdbTool's executable")]
+    #[structopt(parse(from_os_str), help = "Path to the RDB file")]
     pub path: PathBuf,
-    #[structopt(parse(from_os_str), help = "Output path to the RDB file relative to RdbTool's executable")]
+    #[structopt(parse(from_os_str), help = "Output path to the RDB file")]
     pub out_path: PathBuf,
+    #[structopt(parse(from_os_str), default_value = "data", help = "Directory where the files to patch are located")]
+    pub data_path: PathBuf,
 }
 
-fn patch_rdb(path: &Path, out_path: &Path) -> Result<(), String> {
-    let mut rdb: Rdb = Rdb::read(&mut Cursor::new(&std::fs::read(path).unwrap())).unwrap();
+fn patch_rdb(args: &Opt) -> Result<(), String> {
+    let mut rdb: Rdb = Rdb::read(&mut Cursor::new(&std::fs::read(&args.path).unwrap())).unwrap();
 
-    let external_path = PathBuf::from(format!("./{}", rdb.header.path));
+    let external_path = if args.data_path.is_relative() {
+        PathBuf::from(std::fs::canonicalize(args.path.parent().unwrap()).unwrap()).join(&args.data_path)
+    } else {
+        args.data_path.to_path_buf()
+    };
 
     if !external_path.exists() {
-        return Err(format!("Couldn't find a directory matching the internal path ({}). Consider making it.", rdb.header.path));
+        return Err(format!("Couldn't find a directory to patch ('{}'). Consider making it.", external_path.display()));
     }
 
     let files = match std::fs::read_dir(external_path) {
@@ -70,7 +76,7 @@ fn patch_rdb(path: &Path, out_path: &Path) -> Result<(), String> {
     let mut bytes = vec![];
     rdb.write(&mut bytes).unwrap();
 
-    match std::fs::write(out_path, bytes) {
+    match std::fs::write(&args.out_path, bytes) {
         Ok(_) => {},
         Err(err) => panic!(err),
     };
@@ -81,7 +87,7 @@ fn patch_rdb(path: &Path, out_path: &Path) -> Result<(), String> {
 fn main() {
     let opt = Opt::from_args();
 
-    if let Err(error_msg) = patch_rdb(&opt.path, &opt.out_path) {
+    if let Err(error_msg) = patch_rdb(&opt) {
         println!("{}", error_msg);
     }
 }

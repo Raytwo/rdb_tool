@@ -103,7 +103,7 @@ impl RdbEntry {
         let mut buffer = Vec::new();        
         
         let mut out_sig = [0;4];
-        test.read(&mut out_sig);
+        test.read(&mut out_sig).unwrap();
 
         if &out_sig == b"IDRK" {
             println!("Already patched");
