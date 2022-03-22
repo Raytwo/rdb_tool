@@ -114,7 +114,7 @@ impl RdbEntry {
 
         let mut header_size = match self.entry_type {
             0 => 0x38,
-            1 => 0x48,
+            1 | 4 => 0x48,
             8 => 0x58,
             12 => 0x68,
             _ => panic!("Unknown entry type found: {}", self.entry_type)
