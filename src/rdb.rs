@@ -112,8 +112,13 @@ impl RdbEntry {
 
         test.seek(SeekFrom::Start(0)).unwrap();
 
-        let header_size = self.entry_size - self.string_size;
-        
+        let mut header_size = match self.entry_type {
+            0 => 0x38,
+            1 => 0x48,
+            8 => 0x58,
+            12 => 0x68,
+            _ => panic!("Unknown entry type found: {}", self.entry_type)
+        };
         self.entry_size = header_size + test.metadata().unwrap().len() as u32;
         self.file_size = test.metadata().unwrap().len() as _;
         self.string_size = self.file_size as _;
@@ -159,6 +164,7 @@ pub struct RdbFlags {
     pub external: bool,
     pub internal: bool,
     pub unk2: B2,
+    // If both are set, file is encrypted
     pub zlib_compressed: bool,
     pub lz4_compressed: bool,
     pub unk3: B10,
