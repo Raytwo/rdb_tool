@@ -11,7 +11,7 @@ use modular_bitfield::prelude::*;
 pub struct RdbHeader {
     pub magic: u32,
     pub version: u32,
-    #[br(assert("version != 0x30303030"))]
+    #[br(assert(version != 0x30303030))]
     pub header_size: u32,
     pub system_id: u32,
     pub file_count: u32,
@@ -24,7 +24,7 @@ pub struct RdbHeader {
 pub struct RdbEntry {
     pub magic: u32,
     pub version: u32,
-    #[br(assert("version != 0x30303030"))]
+    #[br(assert(version != 0x30303030))]
     pub entry_size: u32,
     pub unk: u32,
     pub string_size: u32,
@@ -114,8 +114,11 @@ impl RdbEntry {
 
         let mut header_size = match self.entry_type {
             0 => 0x38,
+            // 1 is KidsSingletonDb? 4 is G1E
             1 | 4 => 0x48,
+            // G1A
             8 => 0x58,
+            // G1M, most likely other model related formats
             12 => 0x68,
             _ => panic!("Unknown entry type found: {}", self.entry_type)
         };
