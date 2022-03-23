@@ -13,4 +13,3 @@ modular-bitfield = "0.10"
 structopt = "0.3.20"
 csv = "1.1"
 serde = { version = "1", features = ["derive"] }
-hex = "0.4.3"
