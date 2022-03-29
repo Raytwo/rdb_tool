@@ -11,7 +11,7 @@ use modular_bitfield::prelude::*;
 pub struct RdbHeader {
     pub magic: u32,
     pub version: u32,
-    #[br(assert(version != 0x30303030))]
+    #[br(assert(version == 0x30303030))]
     pub header_size: u32,
     pub system_id: u32,
     pub file_count: u32,
@@ -24,7 +24,7 @@ pub struct RdbHeader {
 pub struct RdbEntry {
     pub magic: u32,
     pub version: u32,
-    #[br(assert(version != 0x30303030))]
+    #[br(assert(version == 0x30303030))]
     pub entry_size: u32,
     pub unk: u32,
     pub string_size: u32,
@@ -138,7 +138,7 @@ impl RdbEntry {
         //writer.write_all(&mut reader.buffer());
         match std::fs::write(path, &buffer) {
             Ok(_) => {},
-            Err(err) => panic!(err),
+            Err(err) => panic!("{}", err),
         };
     }
 }
@@ -154,8 +154,8 @@ pub struct Rdb {
 }
 
 impl Rdb {
-    pub fn get_entry_by_KTID(&mut self, ktid: u32) -> Option<&mut RdbEntry> {
-        self.entries.iter_mut().find(|x| x.file_ktid == ktid)
+    pub fn get_entry_by_KTID(&self, ktid: crate::ktid::KTID) -> Option<&RdbEntry> {
+        self.entries.iter().find(|x| x.file_ktid == ktid.as_u32())
     }
 }
 

@@ -63,7 +63,12 @@ impl fmt::Display for KTID {
 }
 
 pub fn ktid(string: &str) -> KTID {
-    KTID(ktid_hash(string, 31))
+    if string.starts_with("0x") {
+        KTID(u32::from_str_radix(string.trim_start_matches("0x"), 16).unwrap())
+
+    } else {
+        KTID(ktid_hash(string, 31))
+    }
 }
 
 pub fn ktid_hash<T: AsRef<[u8]>>(text: T, mut key: i32) -> u32 {

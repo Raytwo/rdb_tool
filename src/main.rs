@@ -8,6 +8,7 @@ mod rdb;
 use rdb::Rdb;
 
 mod ktid;
+use ktid::{KTID, ktid};
 
 mod typeinfo;
 
@@ -19,6 +20,20 @@ use structopt::StructOpt;
     about = "Simple command-line tool to manipulate RDB files."
 )]
 struct Opt {
+    #[structopt(subcommand)]
+    cmd: Command,
+}
+
+#[derive(Debug, StructOpt)]
+enum Command {
+    /// Patch a RDB file
+    Patch(Patch),
+    /// Output relevant informations about a RDB entry
+    Print(Print),
+}
+
+#[derive(Debug, StructOpt)]
+struct Patch {
     #[structopt(parse(from_os_str), help = "Path to the RDB file")]
     pub path: PathBuf,
     #[structopt(parse(from_os_str), help = "Output path to the RDB file")]
@@ -27,7 +42,15 @@ struct Opt {
     pub data_path: PathBuf,
 }
 
-fn patch_rdb(args: &Opt) -> Result<(), String> {
+#[derive(Debug, StructOpt)]
+struct Print {
+    #[structopt(parse(from_os_str), help = "Path to the RDB file")]
+    pub path: PathBuf,
+    #[structopt(help = "The KTID you would like to print")]
+    pub ktid: String,
+}
+
+fn patch_rdb(args: &Patch) -> Result<(), String> {
     let mut rdb: Rdb = Rdb::read(&mut Cursor::new(&std::fs::read(&args.path).unwrap())).unwrap();
 
     let external_path = if args.data_path.is_relative() {
@@ -97,10 +120,19 @@ fn main() {
         println!("{}", err);
         std::process::exit(1);
     });
-    println!("{:#?}", opt);
 
-    if let Err(error_msg) = patch_rdb(&opt) {
-        println!("{}", error_msg);
+    match opt.cmd {
+        Command::Patch(args) => {
+            if let Err(error_msg) = patch_rdb(&args) {
+                println!("{}", error_msg);
+            }
+        },
+        Command::Print(args) => {
+            let ktid = ktid(&args.ktid);
+            let rdb = Rdb::read(&mut Cursor::new(&std::fs::read(&args.path).unwrap())).unwrap();
+            let entry = rdb.get_entry_by_KTID(ktid).unwrap();
+            println!("{:#?}", entry);
+        },
     }
 }
 
