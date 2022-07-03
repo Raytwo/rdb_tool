@@ -1,4 +1,4 @@
-use std::{fs::OpenOptions, io::{Seek, SeekFrom, BufReader, BufWriter, Read}, path::{PathBuf, Path}};
+use std::{fs::OpenOptions, io::{Seek, SeekFrom, BufReader, BufWriter, Read}, path::{PathBuf, Path}, str::Utf8Error};
 
 use binread::{BinRead, NullString, BinResult, BinReaderExt};
 
@@ -80,18 +80,22 @@ impl RdbEntry {
         std::str::from_utf8(self.name.as_slice()).unwrap()
     }
 
-    pub fn get_name_mut(&mut self) -> &mut str {
-        std::str::from_utf8_mut(self.name.as_mut_slice()).unwrap()
+    pub fn get_name_mut(&mut self) -> Result<&mut str, Utf8Error> {
+        std::str::from_utf8_mut(self.name.as_mut_slice())
     }
 
     pub fn set_external_file(&mut self, path: &std::path::Path) {
-        //let mut name = self.get_name_mut().to_string();
+        let mut name = if let Ok(name) = self.get_name_mut() {
+            name.to_string()
+        } else {
+            String::new()
+        };
 
         self.file_size = path.metadata().unwrap().len();
 
-        // if let Some(size_marker) = name.find("@") {
-        //     name.replace_range(size_marker.., &format!("@{:x}", self.file_size));
-        // }
+        if let Some(size_marker) = name.find('@') {
+            name.replace_range(size_marker.., &format!("@{:x}", self.file_size));
+        }
 
         if self.file_size == 0 {
             println!("Filesize is 0. Are you sure about that?");
@@ -100,9 +104,9 @@ impl RdbEntry {
         // Remove the size of the original string
         self.entry_size -= self.string_size;
         // Put the edited name back into the entry
-        self.name = Vec::new();
+        self.name = name.as_bytes().to_vec();
         // Fix the size of the string
-        self.string_size = 0 as _;
+        self.string_size = name.len() as _;
         // Edit the size of the entry to take the new name into account
         self.entry_size += self.string_size;
 
