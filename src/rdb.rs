@@ -1,7 +1,6 @@
-use std::{fs::OpenOptions, io::{BufReader, BufWriter}, path::PathBuf};
-use std::io::*;
+use std::{fs::OpenOptions, io::{Seek, SeekFrom, BufReader, BufWriter, Read}, path::{PathBuf, Path}};
 
-use binread::{io::SeekFrom, BinRead, NullString};
+use binread::{BinRead, NullString, BinResult, BinReaderExt};
 
 use binwrite::BinWrite;
 
@@ -112,11 +111,11 @@ impl RdbEntry {
 
         test.seek(SeekFrom::Start(0)).unwrap();
 
-        let mut header_size = match self.entry_type {
+        let header_size = match self.entry_type {
             0 => 0x38,
             // 1 is KidsSingletonDb? 4 is G1E
             1 | 4 => 0x48,
-            // G1A
+            // G1A, G1T
             8 => 0x58,
             // G1M, most likely other model related formats
             12 => 0x68,
@@ -136,7 +135,22 @@ impl RdbEntry {
 
         // self.write(&mut writer).unwrap();
         //writer.write_all(&mut reader.buffer());
-        match std::fs::write(path, &buffer) {
+        // Check if we're dealing with a KTID or an actual filename
+        let filename = if path.file_name().unwrap().to_str().unwrap().starts_with("0x") {
+            // Strip the extension (Cethleann keeps the extension even if the hash is missing)
+            path.file_stem().unwrap().to_str().unwrap()
+        } else {
+            // Get the full filename with extension
+            path.file_name().unwrap().to_str().unwrap()
+        };
+
+        let out_path = PathBuf::from(format!("./data/0x{}.file", crate::ktid(filename)));
+
+        if !out_path.exists() {
+            std::fs::create_dir_all("./data/").unwrap();
+        }
+
+        match std::fs::write(out_path, &buffer) {
             Ok(_) => {},
             Err(err) => panic!("{}", err),
         };
@@ -154,8 +168,22 @@ pub struct Rdb {
 }
 
 impl Rdb {
-    pub fn get_entry_by_KTID(&self, ktid: crate::ktid::KTID) -> Option<&RdbEntry> {
+    pub fn open<P: AsRef<Path>>(path: P) -> BinResult<Self> {
+        Self::from_reader(std::io::BufReader::new(std::fs::File::open(path)?))
+    }
+
+    pub fn from_reader<R: std::io::Read + std::io::Seek + Send + 'static>(mut reader: R) -> BinResult<Self> {
+        let rdb: Self = reader.read_le()?;
+
+        Ok(rdb)
+    }
+
+    pub fn get_entry_by_ktid(&self, ktid: crate::ktid::KTID) -> Option<&RdbEntry> {
         self.entries.iter().find(|x| x.file_ktid == ktid.as_u32())
+    }
+
+    pub fn get_entry_by_ktid_mut(&mut self, ktid: crate::ktid::KTID) -> Option<&mut RdbEntry> {
+        self.entries.iter_mut().find(|x| x.file_ktid == ktid.as_u32())
     }
 }
 

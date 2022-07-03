@@ -38,7 +38,7 @@ struct Patch {
     pub path: PathBuf,
     #[structopt(parse(from_os_str), help = "Output path to the RDB file")]
     pub out_path: PathBuf,
-    #[structopt(parse(from_os_str), default_value = "data", help = "Directory where the files to patch are located")]
+    #[structopt(parse(from_os_str), default_value = "patch", help = "Directory where the files to patch are located")]
     pub data_path: PathBuf,
 }
 
@@ -51,7 +51,7 @@ struct Print {
 }
 
 fn patch_rdb(args: &Patch) -> Result<(), String> {
-    let mut rdb: Rdb = Rdb::read(&mut Cursor::new(&std::fs::read(&args.path).unwrap())).unwrap();
+    let mut rdb = Rdb::open(&args.path).unwrap();
 
     let external_path = if args.data_path.is_relative() {
 
@@ -84,19 +84,18 @@ fn patch_rdb(args: &Patch) -> Result<(), String> {
             continue;
         }
 
-        let filename = &entry.file_name().to_str().unwrap().to_owned();
+        let path = &entry.path();
 
-        if !filename.ends_with(".file") {
-            println!("File {} does not have the '.file' extension. Skipping.", filename);
-            continue;
-        }
+        // Check if we're dealing with a KTID or an actual filename
+        let filename = if path.file_name().unwrap().to_str().unwrap().starts_with("0x") {
+            // Strip the extension (Cethleann keeps the extension even if the hash is missing)
+            path.file_stem().unwrap().to_str().unwrap()
+        } else {
+            // Get the full filename with extension
+            path.file_name().unwrap().to_str().unwrap()
+        };
 
-        if !filename.starts_with("0x") {
-            println!("File {} is not named after an offset (Ex.: 0x69696969.file). Skipping", filename);
-            continue;
-        }
-
-        match rdb.entries.iter_mut().find(|x| &x.get_external_path().to_str().unwrap().to_owned() == filename)  {
+        match rdb.get_entry_by_ktid_mut(crate::ktid(filename)) {
             Some(entry_found) => {
                 println!("Patching {}", filename);
                 entry_found.make_external();
@@ -130,7 +129,7 @@ fn main() {
         Command::Print(args) => {
             let ktid = ktid(&args.ktid);
             let rdb = Rdb::read(&mut Cursor::new(&std::fs::read(&args.path).unwrap())).unwrap();
-            let entry = rdb.get_entry_by_KTID(ktid).unwrap();
+            let entry = rdb.get_entry_by_ktid(ktid).unwrap();
             println!("{:#?}", entry);
         },
     }
