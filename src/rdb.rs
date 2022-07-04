@@ -1,4 +1,4 @@
-use std::{fs::OpenOptions, io::{Seek, SeekFrom, BufReader, BufWriter, Read}, path::{PathBuf, Path}};
+use std::{fs::OpenOptions, io::{Seek, SeekFrom, BufReader, BufWriter, Read}, path::{PathBuf, Path}, str::Utf8Error};
 
 use binread::{BinRead, NullString, BinResult, BinReaderExt};
 
@@ -40,6 +40,27 @@ pub struct RdbEntry {
     pub name: Vec<u8>,
 }
 
+#[derive(BinRead, BinWrite, Debug, Clone)]
+pub struct IdrkEntry {
+    pub magic: u32,
+    pub version: u32,
+    #[br(assert(version == 0x30303030))]
+    pub entry_size: u32,
+    pub unk: u32,
+    pub string_size: u32,
+    pub unk2: u32,
+    pub file_size: u64,
+    pub entry_type: u32,
+    pub file_ktid: u32,
+    pub type_info_ktid: u32,
+    pub flags: RdbFlags,
+    #[br(count = (entry_size - string_size) - 0x30)]
+    pub unk_content: Vec<u8>,
+    #[br(count = string_size, align_after = 4)]
+    #[binwrite(align_after(4))]
+    pub name: Vec<u8>,
+}
+
 impl RdbEntry {
     pub fn get_external_path(&self) -> PathBuf {
         PathBuf::from(&format!("0x{:08x}.file", self.file_ktid))
@@ -59,16 +80,20 @@ impl RdbEntry {
         std::str::from_utf8(self.name.as_slice()).unwrap()
     }
 
-    pub fn get_name_mut(&mut self) -> &mut str {
-        std::str::from_utf8_mut(self.name.as_mut_slice()).unwrap()
+    pub fn get_name_mut(&mut self) -> Result<&mut str, Utf8Error> {
+        std::str::from_utf8_mut(self.name.as_mut_slice())
     }
 
     pub fn set_external_file(&mut self, path: &std::path::Path) {
-        let mut name = self.get_name_mut().to_string();
+        let mut name = if let Ok(name) = self.get_name_mut() {
+            name.to_string()
+        } else {
+            String::new()
+        };
 
         self.file_size = path.metadata().unwrap().len();
 
-        if let Some(size_marker) = name.find("@") {
+        if let Some(size_marker) = name.find('@') {
             name.replace_range(size_marker.., &format!("@{:x}", self.file_size));
         }
 
